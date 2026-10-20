@@ -1,58 +1,51 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ⚡ Laravel 11 高併發搶票與秒殺系統 (Ticket Flash-Sale)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+基於 **PHP 8.3 + Laravel 11 + Redis 訊息佇列 + CLI Worker + MySQL** 的高併發搶票架構，解決瞬間流量衝垮資料庫與超賣問題。
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🌟 核心特色與架構
+- **Redis Lua 原子扣庫存**：將「防重複購票檢查」與「庫存扣除」封裝於單一 Lua 腳本，徹底杜絕併發超賣。
+- **Laravel Queue 異步削峰**：Web API 扣庫成功後立即將任務推入 Redis 佇列並回傳 HTTP 202，瞬間釋放連線。
+- **獨立 CLI Queue Worker**：背景程式定速從 Redis 佇列消費任務，透過 MySQL 交易與樂觀鎖安全落盤。
+- **快取預熱 Artisan 指令**：提供 `ticket:init` 指令，活動開跑前自動同步 MySQL 庫存至 Redis，保護資料庫。
+- **前端互動模擬器**：內建即時輪詢與一鍵併發搶票面板，直觀驗證佇列削峰效果。
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 🚀 快速啟動指南
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
+### 1. 安裝套件
 ```bash
-composer require laravel/boost --dev
+composer install
 
-php artisan boost:install
-```
+2. 環境設定
+複製環境變數範本並產生安全金鑰：
+cp .env.example .env
+php artisan key:generate
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+請確認 .env 中的連線設定：
+DB_DATABASE=flash_sale
+QUEUE_CONNECTION=redis
+SESSION_DRIVER=file
+REDIS_HOST=127.0.0.1
 
-## Contributing
+3. 資料庫遷移（自動建表）
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+php artisan migrate
 
-## Code of Conduct
+4. 快取預熱（載入 100 張票至 Redis）
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+php artisan ticket:init 1 100
 
-## Security Vulnerabilities
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+5. 啟動系統
+請開啟兩個終端機視窗分別執行：
+視窗 1（背景 Queue Worker）：
+php artisan queue:work redis --queue=ticket_orders
 
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+視窗 2（Web 伺服器）：
+php artisan serve
+6. 瀏覽器測試
+開啟瀏覽器訪問：
+👉 http://127.0.0.1:8000
